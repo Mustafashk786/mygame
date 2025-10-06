@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dastan-e-Hayat — Interactive</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#ff5b88;
+    --accent-2:#af3250;
+    --fg:#f6e9ec;
+    --muted:#c7a3af;
+    --glass: rgba(255,255,255,0.06);
+  }
+  html,body{height:100%;margin:0;font-family:'Inter', 'Cormorant Garamond', serif;background:#0c0610; color:var(--fg); -webkit-font-smoothing:antialiased;}
+  /* seductive animated background */
+  body::before{
+    content:"";position:fixed;inset:0;background:
+      radial-gradient(600px 300px at 15% 25%, rgba(255,60,120,0.10), transparent 10%),
+      radial-gradient(500px 260px at 85% 70%, rgba(120,60,180,0.08), transparent 12%),
+      linear-gradient(180deg,#0f0712 0%, #08040a 100%);
+    z-index:-2;filter:blur(20px);transition:filter .6s ease;
+  }
+  .flare{position:fixed;inset:0;pointer-events:none;z-index:-1;mix-blend-mode:screen}
+  .flare::after{content:"";position:absolute;left:10%;top:10%;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle, rgba(255,90,130,0.06), transparent 30%);filter:blur(40px);animation:float 12s linear infinite;}
+  .flare::before{content:"";position:absolute;right:5%;bottom:5%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle, rgba(120,80,200,0.05), transparent 28%);filter:blur(50px);animation:float 16s linear infinite reverse;}
+  @keyframes float{0%{transform:translateY(0)}50%{transform:translateY(12px)}100%{transform:translateY(0)}}
+
+  #app{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;box-sizing:border-box}
+  #game-container{width:min(100%,900px);max-width:920px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:18px;padding:26px;border:1px solid rgba(255,255,255,0.04);box-shadow: 0 10px 40px rgba(0,0,0,0.6);position:relative;overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{font-family:'Cormorant Garamond';margin:0;color:var(--accent);font-size:1.6rem;letter-spacing:0.6px}
+  .sub{color:var(--muted);font-size:0.9rem}
+
+  /* center overlay start */
+  #start-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,2,6,0.65), rgba(0,0,0,0.75));z-index:50;backdrop-filter:blur(4px)}
+  .start-card{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));padding:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.04);text-align:center;max-width:520px}
+  .start-btn{margin-top:18px;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;border:none;padding:16px 26px;border-radius:999px;font-size:1.05rem;cursor:pointer;box-shadow:0 8px 30px rgba(175,50,80,0.25)}
+  .start-input{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);margin-top:10px;background:transparent;color:var(--fg);font-size:0.98rem}
+
+  /* main story area */
+  #stage{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start;margin-top:18px}
+  @media (max-width:880px){#stage{grid-template-columns:1fr;}}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  #story{min-height:360px;position:relative;overflow:hidden}
+  .dialogue{font-size:1.05rem;line-height:1.6;color:#f8e9ee;padding:12px 14px;border-radius:10px;background:linear-gradient(180deg, rgba(0,0,0,0.15), rgba(255,255,255,0.01));box-shadow:0 6px 20px rgba(0,0,0,0.5)}
+  .name-tag{font-weight:700;color:var(--accent);margin-bottom:8px}
+  .typing{white-space:pre-wrap;min-height:70px}
+  .choices{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+  .choice-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:12px;border-radius:12px;color:var(--fg);cursor:pointer;text-align:left}
+  .choice-btn:hover{background:rgba(255,255,255,0.02);transform:translateY(-3px)}
+
+  /* right column (controls & music & timeline) */
+  #hud{position:relative}
+  .music-bar{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .play-btn{padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;cursor:pointer}
+  .song-title{font-weight:600;font-size:0.98rem;text-align:center}
+  .mini-info{font-size:0.85rem;color:var(--muted);text-align:center;margin-top:6px}
+  .timeline{margin-top:10px;font-size:0.9rem;color:var(--muted);text-align:center;border-radius:8px;padding:8px;border:1px dashed rgba(255,255,255,0.02)}
+  .mood-flare{height:8px;border-radius:999px;margin-top:12px;background:linear-gradient(90deg,#ff8bb7,#b96aa6);opacity:0.7}
+
+  /* cinematic effects */
+  .scene-dark{filter:brightness(0.55) saturate(0.9);transition:filter .6s ease}
+  .scene-sad{box-shadow:inset 0 0 120px rgba(0,0,0,0.5)}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;background:rgba(0,0,0,0.6);padding:10px 16px;border-radius:999px;color:#fff;font-weight:600;backdrop-filter:blur(4px)}
+
+  /* tiny helpers */
+  .small{font-size:0.85rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="flare" aria-hidden="true"></div>
+
+<div id="app">
+  <div id="game-container" role="application" aria-label="Dastan-e-Hayat game">
+    <header>
+      <div>
+        <h1>Dastan-e-Hayat</h1>
+        <div class="sub small">A cinematic interactive story — your choices shape the fate</div>
+      </div>
+      <div class="small" id="top-year">Year: 2025</div>
+    </header>
+
+    <div id="stage">
+      <div id="story" class="panel" aria-live="polite">
+        <!-- dialogue injected here -->
+        <div id="dialog-wrap">
+          <div class="dialogue">
+            <div class="name-tag" id="speaker">Narrator</div>
+            <div class="typing" id="dialogue-text">Welcome. Click Start to begin your journey — set your name and your partner's name .</div>
+          </div>
+        </div>
+
+        <div id="choices" class="choices" style="margin-top:14px"></div>
+      </div>
+
+      <aside id="hud" class="panel">
+        <div class="music-bar">
+          <div class="song-title" id="music-info">🎵 Now playing: Zara Sa</div>
+          <button id="play-toggle" class="play-btn" aria-pressed="false" onclick="togglePlay()">Play ▶️</button>
+          <div class="mini-info">Tip: Click Play once to allow future automatic switches (browser rule).</div>
+        </div>
+
+        <div class="timeline" id="timeline">Saal: 2025</div>
+
+        <div style="margin-top:12px;">
+          <label class="small">Choose track now (optional):</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <button class="choice-btn small" onclick="setSong('zara-sa',false)">Zara Sa</button>
+            <button class="choice-btn small" onclick="setSong('hamari-adhuri',false)">Hamari Adhuri</button>
+            <button class="choice-btn small" onclick="setSong('dil-ibadat',false)">Dil Ibaadat</button>
+            <button class="choice-btn small" onclick="setSong('jane-tamanna',false)">Jane Tamanna</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+  </div>
+</div>
+
+<!-- start overlay -->
+<div id="start-overlay" role="dialog" aria-label="Start" >
+  <div class="start-card">
+    <h2 style="margin:0;color:var(--accent)">Enter Your Name</h2>
+    <input id="player-name" class="start-input" placeholder="Type your name (e.g., Alex)" />
+    <h3 style="margin-top:12px;color:var(--muted);font-weight:600">Your Partner's Name</h3>
+    <input id="partner-name" class="start-input" placeholder="Type her name (e.g., Sara)" />
+    <p class="small" style="margin-top:12px">When you press Start, the game loads with a seductive cinematic mood. Default music: Zara Sa.</p>
+    <button class="start-btn" onclick="startGame()">Start the Journey 🚀</button>
+  </div>
+</div>
+
+<!-- audio element -->
+<audio id="bg-audio" crossorigin="anonymous"></audio>
+
+<!-- tiny toast -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<script>
+/* ---------- SONG URLs (raw.githubusercontent from your repo links) ---------- */
+/* Provided links from you (converted to raw.githubusercontent). If any 404 occurs open the raw file URL in browser and replace the string. */
+const SONGS = {
+  'zara-sa': "https://raw.githubusercontent.com/Mustafashk786/mygame/main/KK%20_%20Zara%20Sa%20-%20Audio%20Lyrical%20_%20Emraan%20Hashmi%20_%20Sonal%20Chauhan%20_%20Pritam%20_%20Sayeed%20Quadri%20_%20Jannat%20(1).mp3",
+  'dil-ibadat': "https://raw.githubusercontent.com/Mustafashk786/mygame/main/KK%20_%20Dil%20Ibaadat%20Kar%20Raha%20Hai%20(Lyrical%20Video)%20_%20Emraan%20Hashmi%20_%20Soha%20Ali%20Khan%20_%20Pritam%20_%20Tum%20Mile.mp3",
+  'hamari-adhuri': "https://raw.githubusercontent.com/Mustafashk786/mygame/main/Hamari%20Adhuri%20Kahani%20-%20Lyrical%20Song%20_%20Arjit%20Singh%20_%20Emraan%20Hashmi%2C%20Vidya%20Balan%20_%20Jeet%20Gannguli%20(1).mp3",
+  /* You didn't provide a distinct raw link for Jane Tamanna; I map it to your Tera Mera file as fallback.
+     Replace SONGS['jane-tamanna'] with the real raw URL if you have it. */
+  'jane-tamanna': "https://raw.githubusercontent.com/Mustafashk786/mygame/main/Tera%20Mera%20Hai%20Pyar%20Ammar%20(%20Ishq%20Murshad%20)%20Full%20video%20song%20%5D%20Ahmad%20Jahanzeb.mp3",
+  'tera-mera': "https://raw.githubusercontent.com/Mustafashk786/mygame/main/Tera%20Mera%20Hai%20Pyar%20Ammar%20(%20Ishq%20Murshad%20)%20Full%20video%20song%20%5D%20Ahmad%20Jahanzeb.mp3"
+};
+
+const audio = document.getElementById('bg-audio');
+audio.preload = 'auto';
+audio.loop = true;
+
+let currentSong = 'zara-sa';
+let userPlayedOnce = false; // to know if browser allowed audio
+
+function setSong(id, tryPlay = false) {
+  if (!SONGS[id]) return;
+  currentSong = id;
+  audio.src = SONGS[id];
+  document.getElementById('music-info').textContent = '🎵 Now playing: ' + titleFor(id);
+  if (tryPlay) {
+    audio.play().catch(()=>{/* blocked until user interacts */});
+  }
+}
+function titleFor(id){
+  if (id === 'zara-sa') return 'Zara Sa';
+  if (id === 'hamari-adhuri') return 'Hamari Adhuri Kahani';
+  if (id === 'dil-ibadat') return 'Dil Ibaadat';
+  if (id === 'jane-tamanna') return 'Jane Tamanna';
+  if (id === 'tera-mera') return 'Tera Mera';
+  return 'Song';
+}
+
+function togglePlay(){
+  const btn = document.getElementById('play-toggle');
+  if (audio.paused){
+    audio.play().then(()=> {
+      btn.textContent = 'Pause ⏸️';
+      btn.setAttribute('aria-pressed','true');
+      userPlayedOnce = true;
+    }).catch(()=> {
+      alert('Browser blocked playback. Click anywhere on the page or press Play again after interacting.');
+    });
+  } else {
+    audio.pause();
+    btn.textContent = 'Play ▶️';
+    btn.setAttribute('aria-pressed','false');
+  }
+}
+
+/* ---------- STORY STATE & UI helpers ---------- */
+let state = {
+  step: 0,
+  player: '',
+  partner: '',
+  year: 2025,
+  proposer: '',
+  kids: 0
+};
+
+const dialogEl = document.getElementById('dialogue-text');
+const speakerEl = document.getElementById('speaker');
+const choicesEl = document.getElementById('choices');
+const timelineEl = document.getElementById('timeline');
+const toastEl = document.getElementById('toast');
+
+function showToast(text, ms=2200){
+  toastEl.textContent = text;
+  toastEl.style.display = 'block';
+  setTimeout(()=> toastEl.style.display='none', ms);
+}
+
+function typing(text, speed=18, cb){
+  // simple typing effect
+  dialogEl.textContent = '';
+  let i=0;
+  const timer = setInterval(()=> {
+    dialogEl.textContent += text.charAt(i);
+    i++;
+    if (i >= text.length){
+      clearInterval(timer);
+      if (cb) setTimeout(cb, 200);
+    }
+  }, speed);
+}
+
+function clearChoices(){ choicesEl.innerHTML=''; }
+
+function renderTimeline(){ timelineEl.textContent = 'Saal: ' + state.year + (state.proposer ? ' | Proposer: ' + state.proposer : ''); }
+
+function startGame(){
+  const p = document.getElementById('player-name').value.trim();
+  const q = document.getElementById('partner-name').value.trim();
+  if (!p || !q){
+    alert('Fill both names. (Don’t use a forbidden name.)');
+    return;
+  }
+  state.player = p;
+  state.partner = q;
+  state.year = 2025;
+  document.getElementById('top-year').textContent = 'Year: ' + state.year;
+  // hide overlay
+  const overlay = document.getElementById('start-overlay');
+  overlay.style.display = 'none';
+  // set initial song (Zara Sa) but do not auto-play; wait for user's Play.
+  setSong('zara-sa', false);
+  // Start scene 1 after small delay
+  setTimeout(()=> goTo(1), 400);
+}
+
+/* ---------- Scene flow (branching) ---------- */
+function goTo(step){
+  state.step = step;
+  renderTimeline();
+  clearChoices();
+
+  if (step === 1){
+    speakerEl.textContent = 'Narrator';
+    typing(`Campus festival — ${state.player} sees ${state.partner} laughing under string lights. Your heart does a flip. What do you do?`,22);
+    choicesEl.innerHTML = '';
+    addChoice('Approach with a smile and ask for coffee.', ()=> goTo(2));
+    addChoice('Pass a note to start a quiet talk.', ()=> goTo(3));
+  }
+
+  else if (step === 2){
+    speakerEl.textContent = state.player;
+    typing(`${state.player}: "Hey — your energy is amazing. Coffee sometime?"`,20);
+    addChoice('Share a vulnerable moment to connect.', ()=> goTo(4));
+    addChoice('Keep it light and tease a little.', ()=> goTo(5));
+  }
+
+  else if (step === 3){
+    speakerEl.textContent = state.player;
+    typing(`${state.player} slips a note: "Could we walk to the library together?"`,20);
+    addChoice('Invite to poetry reading (mushaira).', ()=> goTo(8));
+    addChoice('Suggest a quiet study alcove together.', ()=> goTo(9));
+  }
+
+  else if (step === 4){
+    speakerEl.textContent = state.partner;
+    typing(`${state.partner} listens with watery eyes — the bond deepens. You whisper dreams of a shared future.`,20);
+    addChoice('Confess hopes for forever.', ()=> goTo(10));
+    addChoice('Laugh it off with a small college prank story.', ()=> goTo(10));
+  }
+
+  else if (step === 5){
+    speakerEl.textContent = state.partner;
+    typing(`${state.partner} laughs, your laughter echoes across the quad. This spark feels electric.`,20);
+    addChoice('Compliment the smile — say it lights your world.', ()=> goTo(10));
+    addChoice('Grab ice cream and hold hands.', ()=> goTo(10));
+  }
+
+  else if (step === 8 || step === 9){
+    speakerEl.textContent = 'Mushaira';
+    typing(`The poetry reading is magical. Later that night you both decide on a Long Drive.`,18);
+    addChoice('Start the Long Drive', ()=> goTo(10));
+  }
+
+  /* Long Drive / moment of expression */
+  else if (step === 10){
+    speakerEl.textContent = 'Narrator';
+    typing(`In the hush of night, ${state.player} and ${state.partner} drive away from city lights. The music hums — choose atmosphere:`,18);
+    // allow player to switch track manually too
+    addChoice('Gaze at the stars and share deep thoughts.', ()=> goTo(10.1));
+    addChoice('Hold hands in silence, feeling the moment.', ()=> goTo(10.1));
+    // update small music hint
+    showToast('Tip: Use Play to allow auto music changes later.');
+  }
+
+  else if (step === 10.1){
+    speakerEl.textContent = 'Narrator';
+    typing(`This is the moment for the special shayari. Do you remember the first line? Type it or choose to attempt.`,16);
+    // show input + submit choice
+    const container = document.createElement('div');
+    container.style.display='flex';
+    container.style.flexDirection='column';
+    container.style.gap='8px';
+    const input = document.createElement('input');
+    input.placeholder = 'Type the special line (first line only)...';
+    input.style.padding='10px'; input.style.borderRadius='8px'; input.style.background='rgba(255,255,255,0.02)'; input.style.color='#fff'; input.style.border='1px solid rgba(255,255,255,0.04)';
+    const btn = document.createElement('button');
+    btn.className='choice-btn';
+    btn.textContent='Recite and Propose';
+    btn.onclick = ()=> {
+      const v = (input.value || '').trim();
+      const normalized = v.toLowerCase().replace(/[^a-z]/g,'');
+      const answer = "Chupke Chupke Raat Din".toLowerCase().replace(/[^a-z]/g,'');
+      if (normalized === answer){
+        state.year += 1;
+        goTo(11);
+      } else {
+        goTo(10.2);
+      }
+    };
+    container.appendChild(input); container.appendChild(btn);
+    choicesEl.appendChild(container);
+  }
+
+  else if (step === 10.2){
+    speakerEl.textContent = state.partner;
+    typing(`${state.player} misrecites — ${state.partner} sighs: "Maybe your love isn't deep enough yet."`,18);
+    addChoice('Propose immediately anyway.', ()=> goTo(11));
+    addChoice('Apologize and wait for morning.', ()=> goTo(11));
+  }
+
+  else if (step === 11){
+    speakerEl.textContent = 'Narrator';
+    typing(`Under moonlight, the question hangs. Who will propose?`,18);
+    addChoice(`${state.player} kneels with a ring.`, ()=> { state.proposer = state.player; state.year += 1; goTo(11.1); });
+    addChoice(`${state.partner} expresses from the heart.`, ()=> { state.proposer = state.partner; state.year += 1; goTo(11.1); });
+  }
+
+  /* HEARTBREAK: 11.1 -> switch music to Hamari Adhuri and darken mood */
+  else if (step === 11.1){
+    speakerEl.textContent = 'Narrator';
+    typing(`Weeks later a misunderstanding cracks the bond. A harsh line is spoken: "Maybe we aren't meant to be."`,18, ()=>{
+      // no-op
+    });
+    // visual mood change
+    document.getElementById('story').classList.add('scene-dark','scene-sad');
+    // auto-switch music to Hamari if allowed
+    setSong('hamari-adhuri', userPlayedOnce);
+    updatePlayState();
+    showToast('Heartbreak — Hamari Adhuri Kahani');
+    addChoice('Make a final attempt to win them back.', ()=> { state.year += 1; document.getElementById('story').classList.remove('scene-sad'); goTo(11.2); });
+    addChoice('Break up and move on.', ()=> goTo(21));
+  }
+
+  else if (step === 11.2){
+    speakerEl.textContent = state.player;
+    typing(`You go to the old meeting spot and hand over a handwritten letter filled with feelings.`,18);
+    addChoice('Give the letter & hope for forgiveness.', ()=> goTo(12));
+    addChoice('Sing outside their house and plead.', ()=> goTo(12));
+  }
+
+  else if (step === 12){
+    speakerEl.textContent = 'Maulana';
+    typing(`Nikah time — they must say "Qubool Hai" three times.`,18);
+    addChoice('Say Qubool Hai', ()=> {
+      state.year += 1;
+      goTo(13);
+      state.proposer = state.proposer || state.player;
+    });
+    addChoice('Refuse and end here', ()=> goTo(21));
+  }
+
+  else if (step === 13){
+    speakerEl.textContent = 'Narrator';
+    typing(`Nikah done! Choose the wedding venue.`,18);
+    addChoice('Romantic Beach Sunset', ()=> { state.wedding='Beach'; goTo(14); });
+    addChoice('Elegant Garden Pavilion', ()=> { state.wedding='Garden'; goTo(14); });
+  }
+
+  else if (step === 14){
+    speakerEl.textContent = 'Narrator';
+    typing(`Honeymoon memories begin. Choose where:`,18);
+    addChoice('Paris', ()=> { state.honeymoon='Paris'; state.year += 3; goTo(15); });
+    addChoice('Maldives', ()=> { state.honeymoon='Maldives'; state.year += 3; goTo(15); });
+  }
+
+  else if (step === 15){
+    speakerEl.textContent = 'Narrator';
+    typing(`After years, choose life path.`,18);
+    addChoice('High-paced career', ()=> { state.career='High'; goTo(16); });
+    addChoice('Peaceful life', ()=> { state.career='Peace'; goTo(16); });
+  }
+
+  else if (step === 16){
+    speakerEl.textContent = 'Narrator';
+    typing(`Kids? How many?`,18);
+    addChoice('1', ()=> { state.kids=1; state.year += 15; goTo(17); });
+    addChoice('2', ()=> { state.kids=2; state.year += 15; goTo(17); });
+    addChoice('3+', ()=> { state.kids=3; state.year += 15; goTo(17); });
+  }
+
+  else if (step === 17){
+    speakerEl.textContent = 'Narrator';
+    typing(`Mid-life choices — help children settle or travel the world?`,18);
+    addChoice('Family Legacy', ()=> { state.legacy='Family'; state.year += 20; goTo(18); });
+    addChoice('Personal Fulfillment', ()=> { state.legacy='Travel'; state.year += 20; goTo(18); });
+  }
+
+  else if (step === 18){
+    speakerEl.textContent = 'Narrator';
+    typing(`The final chapter approaches. How will their life be remembered?`,18);
+    addChoice('A tale of enduring love', ()=> goTo(99));
+    addChoice('A story of success & travel', ()=> goTo(99));
+  }
+
+  else if (step === 21){
+    speakerEl.textContent = 'Narrator';
+    typing(`The journey ends here. Sometimes timing is not right.`,18);
+    addChoice('Start New Journey', ()=> resetGame());
+  }
+
+  else if (step === 99){
+    speakerEl.textContent = 'Narrator';
+    typing(`${state.player} and ${state.partner} lived until ${state.year} with ${state.kids} children. The story becomes legend.`,18, ()=>{
+      // ending: switch to Jane Tamanna
+      setSong('jane-tamanna', userPlayedOnce);
+      updatePlayState();
+      showToast('Ending — Jane Tamanna',{});
+    });
+    addChoice('Play Again', ()=> resetGame());
+  }
+
+  // update small HUD
+  document.getElementById('music-info').textContent = '🎵 Now playing: ' + titleFor(currentSong);
+}
+
+/* helper to add choice */
+function addChoice(text, fn){
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn';
+  btn.textContent = text;
+  btn.onclick = ()=> fn();
+  choicesEl.appendChild(btn);
+}
+
+/* update play button label according to audio state */
+function updatePlayState(){
+  const btn = document.getElementById('play-toggle');
+  if (audio.paused) { btn.textContent = 'Play ▶️'; btn.setAttribute('aria-pressed','false'); }
+  else { btn.textContent = 'Pause ⏸️'; btn.setAttribute('aria-pressed','true'); }
+}
+
+/* ---------- submit & reset ---------- */
+function resetGame(){
+  state = {step:0,player:'',partner:'',year:2025,proposer:'',kids:0};
+  // show overlay again
+  document.getElementById('start-overlay').style.display='flex';
+  document.getElementById('dialogue-text').textContent = 'Welcome. Click Start to begin.';
+  document.getElementById('speaker').textContent = 'Narrator';
+  setSong('zara-sa', false);
+  updatePlayState();
+  document.getElementById('timeline').textContent = 'Saal: 2025';
+  document.getElementById('top-year').textContent = 'Year: 2025';
+}
+
+/* ---------- initial bindings ---------- */
+document.addEventListener('DOMContentLoaded', ()=> {
+  // prepare default song but don't play
+  setSong('zara-sa', false);
+  updatePlayState();
+
+  // clicking anywhere after start attempt helps browsers allow audio
+  document.body.addEventListener('click', ()=> {
+    if (!userPlayedOnce && !audio.paused){
+      userPlayedOnce = true;
+    }
+  });
+
+  // update play/pause on audio events
+  audio.addEventListener('play', ()=> { userPlayedOnce = true; updatePlayState(); });
+  audio.addEventListener('pause', ()=> updatePlayState());
+});
+
+/* expose setSong globally for quick buttons */
+window.setSong = setSong;
+window.togglePlay = togglePlay;
+window.goTo = goTo;
+window.startGame = startGame;
+window.resetGame = resetGame;
+</script>
+</body>
+</html>
